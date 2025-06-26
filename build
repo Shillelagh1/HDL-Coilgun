@@ -1,0 +1,8 @@
+#!/bin/bash
+
+mkdir bin
+yosys -o bin/hdl_cg.json \
+    -p "read_verilog cg_core/cg_core.v" \
+    -p "synth_ice40"
+# nextpnr-ice40 --lp384 --package qn32 --json bin/hdl_cg.json --pcf hdl_cg.pcf --asc bin/hdl_cg.asc
+# icepack bin/hdl_cg.asc bin/hdl_cg.bin
