@@ -1,10 +1,13 @@
 #!/bin/bash
 
 mkdir bin
-rm hdl_cg.json
+rm bin/hdl_cg.json
+rm bin/hdl_cg.asc
+rm bin/hdl_cg.bin
 yosys -q -o bin/hdl_cg.json \
-    -p "read_verilog cg_core/cg_core.v" \
+    -p "read_verilog top.v i2c_core/i2c_core.v" \
+    -p "hierarchy -top cg_top" \
     -p "synth_ice40"
 
-nextpnr-ice40 --lp384 --package qn32 --json bin/hdl_cg.json --asc bin/hdl_cg.asc
-# icepack bin/hdl_cg.asc bin/hdl_cg.bin
+nextpnr-ice40 --lp384 --package qn32 --pcf top.pcf --json bin/hdl_cg.json --asc bin/hdl_cg.asc
+icepack bin/hdl_cg.asc bin/hdl_cg.bin
