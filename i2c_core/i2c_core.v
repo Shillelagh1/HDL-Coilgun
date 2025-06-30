@@ -11,7 +11,8 @@ input[3:0] I_myaddr,
 output[7:0] O_creg,
 
 // debug
-output O_started
+output O_started,
+output[7:0] dbg
 );
     localparam STATE_RDADDR = 8'd0;
     localparam STATE_SENDACK = 8'd1;
@@ -21,16 +22,19 @@ output O_started
     localparam STATE_READ = 8'd4;
     localparam STATE_READ_ACK = 8'd6;
 
+    // Process Registers
     reg R_started = 0;
     reg[7:0] R_state = 0;
     reg[7:0] R_count = 0;
     reg[7:0] R_addr = 0;    // [7:1]: Address, [0]: R/|W
     reg[7:0] R_regaddr = 0;
 
-    reg R_I_scl = 0;
+    // Input registers
+    reg[2:0] R_I_scl = 0;
     reg R_I_sda = 0;
 
-    reg R_O_sda = 0;
+    // Output registers
+    reg R_O_sda = 0;    
     reg R_OE_sda = 0;
 
     assign O_sda = R_O_sda;
@@ -40,11 +44,12 @@ output O_started
     reg[7:0] U_creg = 0; // 0: [R/W] Config Byte
     assign O_creg = U_creg;
 
-    // Debug
-    assign O_started = R_I_sda;
+    // Debug ===== REMOVE =====
+    assign O_started = R_started;
+    assign dbg = R_state;
 
     always @(posedge I_clk) begin
-        R_I_scl <= I_scl;
+        R_I_scl <= {R_I_scl[1:0], I_scl};
         R_I_sda <= I_sda;
 
         // START sequence
@@ -57,11 +62,11 @@ output O_started
 
         // STOP sequence
         if ((!R_I_sda & I_sda) & I_scl) begin
-            R_started = 0;
+            R_started <= 0;
         end
 
         // Posedge SCL
-        if ((!R_I_scl & I_scl) & R_started) begin
+        if ((R_I_scl == 3'b011) & R_started) begin
             case(R_state)
                 // Read I2C address
                 // --> SENDACK

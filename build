@@ -5,7 +5,7 @@ rm bin/hdl_cg.json
 rm bin/hdl_cg.asc
 rm bin/hdl_cg.bin
 yosys -q -o bin/hdl_cg.json \
-    -p "read_verilog top.v i2c_core/i2c_core.v" \
+    -p "read_verilog top.v i2c_core/i2c_core.v clkdiv/clkdiv.v" \
     -p "hierarchy -top cg_top" \
     -p "synth_ice40"
 
