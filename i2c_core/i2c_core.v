@@ -9,6 +9,10 @@ input[3:0] I_myaddr,
 
 // registers
 output[7:0] O_creg,
+output[23:0] O_dly,
+output[23:0] O_lmt,
+input[7:0] I_eflg,
+input[23:0] I_acc,
 
 // debug
 output O_started,
@@ -19,8 +23,15 @@ output[7:0] dbg
     localparam STATE_WRITE_RDADDR = 8'd2;
     localparam STATE_WRITE_REGACK = 8'd5;
     localparam STATE_WRITE = 8'd3;
+    localparam STATE_WRITE_DATACK = 8'd7;
     localparam STATE_READ = 8'd4;
     localparam STATE_READ_ACK = 8'd6;
+
+    localparam ADDR_CREG = 8'd0;
+    localparam ADDR_EFLG = 8'd1;
+    localparam ADDR_ACC = 8'd2;
+    localparam ADDR_DLY = 8'd3;
+    localparam ADDR_LMT = 8'd4;
 
     // Process Registers
     reg R_started = 0;
@@ -41,8 +52,12 @@ output[7:0] dbg
     assign OE_sda = R_OE_sda;
 
     // I2C registers
-    reg[7:0] U_creg = 0; // 0: [R/W] Config Byte
+    reg[7:0] U_creg = 0;
+    reg[23:0] U_dly = 0;
+    reg[23:0] U_lmt = 0;
     assign O_creg = U_creg;
+    assign O_dly = U_dly;
+    assign O_lmt = U_lmt;
 
     // Debug ===== REMOVE =====
     assign O_started = R_started;
@@ -98,11 +113,22 @@ output[7:0] dbg
                 STATE_WRITE_RDADDR: begin
                     R_regaddr[R_count] <= I_sda;
                     if (R_count == 0) begin
-                        // Switch for register size :]
                         case(R_regaddr)
-                            0: begin    // creg
+                            ADDR_CREG: begin
                                 R_count <= 7;
                                 R_state <= STATE_WRITE_REGACK;
+                            end
+                            ADDR_LMT: begin
+                                R_count <= 23;
+                                R_state <= STATE_WRITE_REGACK;
+                            end
+                            ADDR_DLY: begin
+                                R_count <= 23;
+                                R_state <= STATE_WRITE_REGACK;
+                            end
+                            default: begin
+                                R_state <= STATE_RDADDR;
+                                R_started <= 0;
                             end
                         endcase
                     end else begin
@@ -119,15 +145,42 @@ output[7:0] dbg
                 // --> READADDR
                 STATE_WRITE: begin
                     case(R_regaddr)
-                        0: begin    // creg
+                        ADDR_CREG: begin
                             U_creg[R_count] <= I_sda;
                         end
+                        ADDR_DLY: begin
+                            U_dly[R_count] <= I_sda;
+                        end
+                        ADDR_LMT: begin
+                            U_lmt[R_count] <= I_sda;
+                        end
                     endcase
+                    R_count <= R_count - 1;
+                    if (R_count[3:0] == 0) begin
+                        R_state <= STATE_WRITE_DATACK;
+                    end
+                end
+
+                STATE_WRITE_DATACK: begin
                     if (R_count == 0) begin
-                        R_state <= STATE_RDADDR;
                         R_started <= 0;
+                        R_state <= STATE_RDADDR;
                     end else begin
-                        R_count <= R_count - 1;
+                        R_state <= STATE_WRITE;
+                    end
+                end
+
+                STATE_READ: begin
+                    if (R_count[3:0] == 0) begin
+                        R_state <= STATE_READ_ACK;
+                    end
+                end
+
+                STATE_READ_ACK: begin
+                    if (!I_sda || R_count == 0) begin
+                        R_state <= STATE_RDADDR;
+                    end else begin
+                        R_state <= STATE_READ;
                     end
                 end
             endcase
@@ -148,9 +201,29 @@ output[7:0] dbg
                     R_OE_sda <= 1;
                     if (R_addr[0] == 1) begin
                         case(R_regaddr)
-                            0: begin    // creg
+                            ADDR_CREG: begin
                                 R_count <= 7;
                                 R_state <= STATE_READ;
+                            end
+                            ADDR_EFLG: begin
+                                R_count <= 7;
+                                R_state <= STATE_READ;
+                            end
+                            ADDR_ACC: begin
+                                R_count <= 23;
+                                R_state <= STATE_READ;
+                            end
+                            ADDR_DLY: begin
+                                R_count <= 23;
+                                R_state <= STATE_READ;
+                            end
+                            ADDR_LMT: begin
+                                R_count <= 23;
+                                R_state <= STATE_READ;
+                            end
+                            default: begin
+                                R_state <= 0;
+                                R_started <= 0;
                             end
                         endcase
                     end
@@ -172,19 +245,36 @@ output[7:0] dbg
                     R_OE_sda <= 0;                   
                 end
 
+                STATE_WRITE_DATACK: begin
+                    R_O_sda <= 0;   // ACK
+                    R_OE_sda <= 1;
+                end
+
                 STATE_READ: begin
                     R_OE_sda <= 1;
+                    R_count <= R_count - 1;
                     case(R_regaddr)
-                        0: begin
+                        ADDR_CREG: begin
                             R_O_sda <= U_creg[R_count];
                         end
+                        ADDR_EFLG: begin
+                            R_O_sda <= I_eflg[R_count];
+                        end
+                        ADDR_ACC: begin
+                            R_O_sda <= I_acc[R_count];
+                        end
+                        ADDR_DLY: begin
+                            R_O_sda <= U_dly[R_count];
+                        end
+                        ADDR_LMT: begin
+                            R_O_sda <= U_lmt[R_count];
+                        end
                     endcase
+                end
 
-                    if (R_count == 0) begin
-
-                    end else begin
-                        R_count <= R_count - 1;
-                    end
+                STATE_READ_ACK: begin
+                    R_OE_sda <= 0;
+                    R_O_sda <= 0;
                 end
             endcase
         end

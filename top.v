@@ -20,6 +20,8 @@ module cg_top(
     assign dbg = R_dbg;
 
     // I2C Modules & Signals
+    reg[23:0] R_acc = 'b000011110000111100001111;
+    reg[7:0] R_eflg = 'b10101010;
     reg[3:0] R_myaddr = 'd2;
     wire WO_sda, WOE_sda;
     wire[7:0] creg;    
@@ -39,6 +41,8 @@ module cg_top(
         .I_clk(I2C_clk),
         .I_myaddr(R_myaddr),
         .O_creg(creg),
+        .I_eflg(R_eflg),
+        .I_acc(R_acc),
         .O_started(R_started),
         .dbg(R_dbg)
     );
