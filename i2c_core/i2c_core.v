@@ -61,7 +61,7 @@ output[7:0] dbg
 
     // Debug ===== REMOVE =====
     assign O_started = R_started;
-    assign dbg = R_state;
+    assign dbg = R_count;
 
     always @(posedge I_clk) begin
         R_I_scl <= {R_I_scl[1:0], I_scl};
@@ -84,7 +84,6 @@ output[7:0] dbg
         if ((R_I_scl == 3'b011) & R_started) begin
             case(R_state)
                 // Read I2C address
-                // --> SENDACK
                 STATE_RDADDR: begin
                     R_addr[R_count] <= I_sda;
                     if (R_count == 0) begin
@@ -100,106 +99,11 @@ output[7:0] dbg
                 end
 
                 // Branch to proper state according to R/W bit
-                // --> WRITE_RDADDR
                 STATE_SENDACK: begin
                     if (R_addr[0] == 0) begin
                         R_count <= 7;
                         R_state <= STATE_WRITE_RDADDR;
-                    end 
-                end
-
-                // Get the address the master is planning to write/read to.
-                // --> WRITE_REGACK
-                STATE_WRITE_RDADDR: begin
-                    R_regaddr[R_count] <= I_sda;
-                    if (R_count == 0) begin
-                        case(R_regaddr)
-                            ADDR_CREG: begin
-                                R_count <= 7;
-                                R_state <= STATE_WRITE_REGACK;
-                            end
-                            ADDR_LMT: begin
-                                R_count <= 23;
-                                R_state <= STATE_WRITE_REGACK;
-                            end
-                            ADDR_DLY: begin
-                                R_count <= 23;
-                                R_state <= STATE_WRITE_REGACK;
-                            end
-                            default: begin
-                                R_state <= STATE_RDADDR;
-                                R_started <= 0;
-                            end
-                        endcase
                     end else begin
-                        R_count <= R_count - 1;
-                    end
-                end
-
-                // --> WRITE
-                STATE_WRITE_REGACK: begin
-                    R_state <= STATE_WRITE;
-                end
-
-                // Read the bits into the selected register
-                // --> READADDR
-                STATE_WRITE: begin
-                    case(R_regaddr)
-                        ADDR_CREG: begin
-                            U_creg[R_count] <= I_sda;
-                        end
-                        ADDR_DLY: begin
-                            U_dly[R_count] <= I_sda;
-                        end
-                        ADDR_LMT: begin
-                            U_lmt[R_count] <= I_sda;
-                        end
-                    endcase
-                    R_count <= R_count - 1;
-                    if (R_count[3:0] == 0) begin
-                        R_state <= STATE_WRITE_DATACK;
-                    end
-                end
-
-                STATE_WRITE_DATACK: begin
-                    if (R_count == 0) begin
-                        R_started <= 0;
-                        R_state <= STATE_RDADDR;
-                    end else begin
-                        R_state <= STATE_WRITE;
-                    end
-                end
-
-                STATE_READ: begin
-                    if (R_count[3:0] == 0) begin
-                        R_state <= STATE_READ_ACK;
-                    end
-                end
-
-                STATE_READ_ACK: begin
-                    if (!I_sda || R_count == 0) begin
-                        R_state <= STATE_RDADDR;
-                    end else begin
-                        R_state <= STATE_READ;
-                    end
-                end
-            endcase
-        end
-
-        // Negedge SCL
-        if ((R_I_scl & !I_scl) & R_started) begin
-            case(R_state)
-                STATE_RDADDR: begin
-                    R_O_sda <= 1;   // don't do anything here
-                    R_OE_sda <= 0;
-                end
-
-                // Send ACK bit for address
-                // --> READ
-                STATE_SENDACK: begin
-                    R_O_sda <= 0;   // ACK
-                    R_OE_sda <= 1;
-                    if (R_addr[0] == 1) begin
                         case(R_regaddr)
                             ADDR_CREG: begin
                                 R_count <= 7;
@@ -229,6 +133,100 @@ output[7:0] dbg
                     end
                 end
 
+                // Get the address the master is planning to write/read to.
+                STATE_WRITE_RDADDR: begin
+                    R_regaddr[R_count] <= I_sda;
+                    if (R_count == 0) begin
+                        case(R_regaddr)
+                            ADDR_CREG: begin
+                                R_count <= 7;
+                                R_state <= STATE_WRITE_REGACK;
+                            end
+                            ADDR_ACC: begin
+                                R_count <= 0;
+                                R_state <= STATE_WRITE_REGACK;
+                            end
+                            ADDR_LMT: begin
+                                R_count <= 23;
+                                R_state <= STATE_WRITE_REGACK;
+                            end
+                            ADDR_DLY: begin
+                                R_count <= 23;
+                                R_state <= STATE_WRITE_REGACK;
+                            end
+                            default: begin
+                                R_state <= STATE_RDADDR;
+                                R_started <= 0;
+                            end
+                        endcase
+                    end else begin
+                        R_count <= R_count - 1;
+                    end
+                end
+
+                STATE_WRITE_REGACK: begin
+                    R_state <= STATE_WRITE;
+                end
+
+                // Read the bits into the selected register
+                STATE_WRITE: begin
+                    case(R_regaddr)
+                        ADDR_CREG: begin
+                            U_creg[R_count] <= I_sda;
+                        end
+                        ADDR_DLY: begin
+                            U_dly[R_count] <= I_sda;
+                        end
+                        ADDR_LMT: begin
+                            U_lmt[R_count] <= I_sda;
+                        end
+                    endcase
+                    R_count <= R_count - 1;
+                    if (R_count[3:0] == 0) begin
+                        R_state <= STATE_WRITE_DATACK;
+                    end
+                end
+
+                STATE_WRITE_DATACK: begin
+                    if (R_count == 0) begin
+                        R_started <= 0;
+                        R_state <= STATE_RDADDR;
+                    end else begin
+                        R_state <= STATE_WRITE;
+                    end
+                end
+
+                STATE_READ: begin
+                    R_count <= R_count - 1;
+                    if (R_count[2:0] == 0) begin
+                        R_state <= STATE_READ_ACK;
+                    end
+                end
+
+                STATE_READ_ACK: begin
+                    if (!I_sda) begin
+                        R_state <= STATE_READ;
+                    end else begin
+                        R_started <= 0;
+                    end
+                end
+            endcase
+        end
+
+        // Negedge SCL
+        if ((R_I_scl & !I_scl) & R_started) begin
+            case(R_state)
+                STATE_RDADDR: begin
+                    R_O_sda <= 1;   // don't do anything here
+                    R_OE_sda <= 0;
+                end
+
+                // Send ACK bit for address
+                STATE_SENDACK: begin
+                    R_O_sda <= 0;   // ACK
+                    R_OE_sda <= 1;
+                end
+
                 STATE_WRITE_RDADDR: begin
                     R_O_sda <= 1;   // don't do anything here
                     R_OE_sda <= 0;
@@ -252,7 +250,6 @@ output[7:0] dbg
 
                 STATE_READ: begin
                     R_OE_sda <= 1;
-                    R_count <= R_count - 1;
                     case(R_regaddr)
                         ADDR_CREG: begin
                             R_O_sda <= U_creg[R_count];
@@ -274,7 +271,6 @@ output[7:0] dbg
 
                 STATE_READ_ACK: begin
                     R_OE_sda <= 0;
-                    R_O_sda <= 0;
                 end
             endcase
         end

@@ -7,7 +7,7 @@ module cg_top(
     // Debug
     output O_started,
     output O_I2C_clk,
-    output[2:0] dbg
+    output[3:0] dbg
 );
     assign O_indicator = creg[0];
 
@@ -20,8 +20,8 @@ module cg_top(
     assign dbg = R_dbg;
 
     // I2C Modules & Signals
-    reg[23:0] R_acc = 'b000011110000111100001111;
-    reg[7:0] R_eflg = 'b10101010;
+    reg[23:0] R_acc = 'b001100110011001100110011;
+    reg[7:0] R_eflg = 'b11111111;
     reg[3:0] R_myaddr = 'd2;
     wire WO_sda, WOE_sda;
     wire[7:0] creg;    
