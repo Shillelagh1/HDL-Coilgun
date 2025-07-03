@@ -1,23 +1,43 @@
+// Owen Kegg (2025) GPLv3
+
+// Slave I2C soft core which provides:
+// * 1 R/W 8-bit register "CREG"
+// * 1 R 8-bit register "EFLG"
+// * 2 R/W 24-bit regsiters "DLY, LMT"
+// * 1 R 24-bit register "ACC"
+
+// NOTE: I_clk should be a 3MHz clock signal which is derived from the
+//     FPGA master clock.
+
+// NOTE: I_sda, O_sda, and OE_sda must be handled in the top level
+//     to work properly. I_sda can be tied to the input, while O_sda
+//     and OE_sda work together to provide a Tri-State output. e.g:
+
+// assign IO_sda = WOE_sda ? WO_sda : 1'bz;
+
 module i2c_core(
-input I_sda,
-output O_sda,
-output OE_sda,
+input I_scl,            // [I] I2C Serial Clock. From master MCU.
+input I_sda,            // [I] I2C Serial Data.
+output O_sda,           // [O] Output I2C Serial Data.
+output OE_sda,          // [O] I2C Serial Data Output Enable. 0 = HiZ.
 
-input I_scl,
-input I_clk,
-input[3:0] I_myaddr,
+input I_clk,            // [I] ASIC Clock. ~3MHz. Independent of SCL.
+input[3:0] I_myaddr,    // [I] 4 bit I2C subaddress. I2C Address = {I_myaddr[3:0], b100}.
 
-// registers
-output[7:0] O_creg,
-output[23:0] O_dly,
-output[23:0] O_lmt,
-input[7:0] I_eflg,
-input[23:0] I_acc,
-
-// debug
-output O_started,
-output[7:0] dbg
+// I2C Registers
+output[7:0] O_creg,     // [O] 8 bit configuration register.
+output[23:0] O_dly,     // [O] 24 bit delay register to switch core.
+output[23:0] O_lmt,     // [O] 24 bit limit register to switch core.
+input[7:0] I_eflg,      // [I] Error/Flag register.
+input[23:0] I_acc       // [I] Accumulator register from switch core.
 );
+    // Register Addresses
+    localparam ADDR_CREG = 8'd0;    // --> O_creg
+    localparam ADDR_EFLG = 8'd1;    // <-- I_eflg
+    localparam ADDR_ACC = 8'd2;     // <-- I_acc
+    localparam ADDR_DLY = 8'd3;     // --> O_dly
+    localparam ADDR_LMT = 8'd4;     // --> O_lmt
+
     localparam STATE_RDADDR = 8'd0;
     localparam STATE_SENDACK = 8'd1;
     localparam STATE_WRITE_RDADDR = 8'd2;
@@ -26,12 +46,6 @@ output[7:0] dbg
     localparam STATE_WRITE_DATACK = 8'd7;
     localparam STATE_READ = 8'd4;
     localparam STATE_READ_ACK = 8'd6;
-
-    localparam ADDR_CREG = 8'd0;
-    localparam ADDR_EFLG = 8'd1;
-    localparam ADDR_ACC = 8'd2;
-    localparam ADDR_DLY = 8'd3;
-    localparam ADDR_LMT = 8'd4;
 
     // Process Registers
     reg R_started = 0;
@@ -47,21 +61,16 @@ output[7:0] dbg
     // Output registers
     reg R_O_sda = 0;    
     reg R_OE_sda = 0;
-
     assign O_sda = R_O_sda;
     assign OE_sda = R_OE_sda;
 
     // I2C registers
     reg[7:0] U_creg = 0;
     reg[23:0] U_dly = 0;
-    reg[23:0] U_lmt = 'b000011110000111100001111;
+    reg[23:0] U_lmt = 0;
     assign O_creg = U_creg;
     assign O_dly = U_dly;
     assign O_lmt = U_lmt;
-
-    // Debug ===== REMOVE =====
-    assign O_started = R_started;
-    assign dbg = R_count;
 
     always @(posedge I_clk) begin
         R_I_scl <= {R_I_scl[1:0], I_scl};
