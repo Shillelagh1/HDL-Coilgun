@@ -1,10 +1,8 @@
-set_io O_indicator 32
-set_io I_scl 30 
 set_io IO_sda 31
-set_io I_clk 6
-set_io O_started 29
-set_io O_I2C_clk 27
-set_io dbg[3] 20
-set_io dbg[2] 26
-set_io dbg[1] 23
-set_io dbg[0] 22 
+set_io I_scl 30
+set_io I_mclk 6
+set_io I_trig 8
+set_io I_gate 7
+set_io I_reset 27
+set_io O_ext 2
+set_io O_soe 1
