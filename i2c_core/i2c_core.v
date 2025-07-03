@@ -54,7 +54,7 @@ output[7:0] dbg
     // I2C registers
     reg[7:0] U_creg = 0;
     reg[23:0] U_dly = 0;
-    reg[23:0] U_lmt = 0;
+    reg[23:0] U_lmt = 'b000011110000111100001111;
     assign O_creg = U_creg;
     assign O_dly = U_dly;
     assign O_lmt = U_lmt;
@@ -182,7 +182,7 @@ output[7:0] dbg
                         end
                     endcase
                     R_count <= R_count - 1;
-                    if (R_count[3:0] == 0) begin
+                    if (R_count[2:0] == 0) begin
                         R_state <= STATE_WRITE_DATACK;
                     end
                 end
